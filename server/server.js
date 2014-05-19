@@ -6,22 +6,110 @@ var Canvas = require("node-canvas");
 
 io.set('log level', 1);
 
-function makeid(len) {
-    var text = "";
-    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+function LCG(l, alphabet) {
+    function genFactors(range) {
+        var z = 2;
+        var n = range;
+        var factors = [];
+        while (Math.pow(z,2) <= n) {
+            if (n % z == 0) {
+                factors.push(z);
+                n /= z;
+            } else {
+                z += 1;
+            }
+        }
+        return factors;
+    }
+    function gcd(a, b) {
+        if (!b) {
+            return a;
+        }
+        return gcd(b, a % b);
+    };
 
-    for( var i=0; i < len; i++ )
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    function sieveA(range) {
+        var factors = genFactors(range);
+        for (var i = range; i > 1; i--) {
+            var im = i-1;
+            var allOf = factors.every(function(p) {
+                return im % p == 0
+            });
 
-    return text;
+            if (allOf) {
+                if (range % 4 == 0) {
+                    if (im % 4 == 0) {
+                        return i;
+                    }
+                } else {
+                    return i;
+                }
+            }
+        }
+        return null;
+    }
+    function sieveC(range) {
+        for (var i = 2; i <= range; i++) {
+            if (gcd(range,i) == 1) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    var min = Math.pow(alphabet.length, l-1);
+    var max = Math.pow(alphabet.length, l);
+
+    if (max+1 == max) {
+        throw new Error('BigInteger version of this class required!');
+    }
+
+    var range = max - min;
+    var a = sieveA(range);
+    var c = sieveC(range);
+
+    if (!a || !c) {
+        throw new Error("illegal arguments");
+    }
+
+    var rnd = Math.floor((Math.random() * range) + 1);
+    var state = ((min+1) + rnd) % range;
+
+    this.nextValue = function() {
+        state = ((a * state + c) % range);
+        return state + min;
+    }
+
+    this.toAlphabet = function(n) {
+        var id = "";
+        while (n != 0) {
+            id += alphabet[n % alphabet.length];
+            n = Math.floor(n / alphabet.length);
+        }
+        return id;
+    }
+
+    this.fromAlphabet = function(str) {
+        var result = 0;
+        var m = 1;
+        str.split("").reverse().forEach(function (ch) {
+            var idx = alphabet.indexOf(ch);
+            result += m * idx;
+            m *= alphabet.length;
+        });
+        return result;
+    }
+
+    this.nextInAlphabet = function() {
+        return this.toAlphabet(this.nextValue());
+    }
 }
 
+var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz";
+var lcgid = new LCG(6,alphabet);
+
 function genRoomName() {
-    var name = makeid(6);
-    while (Room.rooms[name]) {
-        name = makeid(6);
-    }
-    return name;
+    return lcgid.nextInAlphabet();
 }
 
 var MaxCanvasWidth = 2000,
